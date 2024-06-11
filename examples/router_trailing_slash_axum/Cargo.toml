@@ -1,0 +1,67 @@
+[package]
+name = "router_trailing_slash_axum"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+codegen-units = 1
+lto = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+axum = { version = "=0.7.4", optional = true }
+console_log = "1"
+log = "0.4"
+leptos = { path = "../../leptos" }
+leptos_axum = { path = "../../integrations/axum", optional = true }
+leptos_meta = { path = "../../meta" }
+leptos_router = { path = "../../router" }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+thiserror = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
+tower = { version = "0.4", optional = true }
+tower-http = { version = "0.5", features = ["fs"], optional = true }
+tracing = { version = "0.1", optional = true }
+wasm-bindgen = "=0.2.92"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.0"
+
+[features]
+hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
+ssr = [
+    "dep:axum",
+    "dep:tokio",
+    "dep:tower",
+    "dep:tower-http",
+    "dep:leptos_axum",
+    "leptos/ssr",
+    "leptos_meta/ssr",
+    "leptos_router/ssr",
+    "dep:tracing",
+]
+
+# Defines a size-optimized profile for the WASM bundle in release mode
+[profile.wasm-release]
+inherits = "release"
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[package.metadata.leptos]
+output-name = "router_trailing_slash_axum"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+site-addr = "127.0.0.1:3000"
+reload-port = 3001
+browserquery = "defaults"
+env = "DEV"
+bin-features = ["ssr"]
+bin-default-features = false
+lib-features = ["hydrate"]
+lib-default-features = false
+
