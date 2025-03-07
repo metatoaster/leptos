@@ -51,7 +51,10 @@ fn HomePage() -> impl IntoView {
     let (_, set_ctx) = signal(Ctx(None));
 
     // #[cfg(not(feature = "ssr"))]
-    on_cleanup(move || set_ctx.set(Ctx(None)));
+    on_cleanup(move || {
+        leptos::logging::log!("on_cleanup");
+        set_ctx.set(Ctx(None));
+    });
 
     let hook = move || {
         let resource = Resource::new_blocking(

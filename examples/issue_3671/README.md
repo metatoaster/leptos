@@ -50,3 +50,28 @@ Sticking with the direct signal usage, but reintroducing the use of
 thread 'tokio-runtime-worker' panicked at /leptos/reactive_graph/src/owner/arena.rs:57:25:
 at /leptos/reactive_graph/src/owner/arena.rs:60:29, the `sandboxed-arenas` feature is active, but no Arena is active
 ```
+
+Again, ensure the cleanup only runs under `#[cfg(not(feature = "ssr"))]`
+will prevent this panic.  This can be verified with `RUST_BACKTRACE=1`:
+
+```
+  16: issue_3671::app::__HomePage::{{closure}}
+             at ./src/app.rs:54:24
+```
+
+The above line corresponds to the `set_ctx` call inside the `on_cleanup`
+closure.
+
+Moreover, only now I just realized I should check whether or not the
+`on_cleanup` be called.  Changing that to log something, like so:
+
+```rust
+    on_cleanup(move || {
+        leptos::logging::log!("on_cleanup");
+        set_ctx.set(Ctx(None));
+    });
+```
+
+Rerun the stress test using a single request will find the peculiar
+behavior where the `on_cleanup` may not run, or run twice, or actually
+trigger the error.
