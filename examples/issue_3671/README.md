@@ -29,28 +29,22 @@ Acquisition of `set_ctx` inside `hook`:
 - [ ] Direct
 
 Method which `tokio::time::sleep` is invoked in the `hook`:
-- [x] Via `ServerFn`
-- [ ] Direct (gated with `feature = "ssr"`)
+- [ ] Via `ServerFn`
+- [x] Direct (gated with `feature = "ssr"`)
 
 A typical run:
 
 ```shell
-$ cargo run --bin stress --features stress -- http://localhost:4000
+$ cargo run --bin stress --features stress -- http://localhost:4000 10000
   ...
-     Running `target/debug/stress 'http://localhost:4000'`
-ok    = 520
-err   = 480
-sizes = {17088: 520}
-$ cargo ...
-  ...
-ok    = 521
-err   = 479
-sizes = {17088: 521}
+     Running `target/debug/stress 'http://localhost:4000' 10000`
+ok    = 9992
+err   = 8
+sizes = {16952: 9992}
 ```
 
-The server process will produce the following panics:
-
-100% is of the kind:
+This time we need to increase the amount of requests made to trigger the
+panic, which is 100% of the following:
 
 ```
 thread 'tokio-runtime-worker' panicked at /leptos/reactive_graph/src/owner.rs:258:26:

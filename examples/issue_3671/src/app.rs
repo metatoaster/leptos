@@ -37,12 +37,6 @@ pub fn App() -> impl IntoView {
     }
 }
 
-#[server]
-async fn server_call() -> Result<(), ServerFnError> {
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    Ok(())
-}
-
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 struct Ctx(Option<()>);
 
@@ -59,14 +53,10 @@ fn HomePage() -> impl IntoView {
     });
 
     let hook = move || {
-        let resource = Resource::new_blocking(
-            move || (),
-            move |_| async move { server_call().await },
-        );
         Suspend::new(async move {
-            let _ = resource.await.map(|_| {
-                expect_context::<WriteSignal<Ctx>>().set(Ctx(Some(())))
-            });
+            #[cfg(feature = "ssr")]
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            expect_context::<WriteSignal<Ctx>>().set(Ctx(Some(())))
         })
     };
     view! {
