@@ -14,11 +14,16 @@ leptos = { path = "../../leptos", features = ["tracing"] }
 leptos_meta = { path = "../../meta" }
 leptos_axum = { path = "../../integrations/axum", optional = true }
 leptos_router = { path = "../../router" }
+reqwest = { version = "0.12", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.39", features = [ "rt-multi-thread", "macros", "time" ], optional = true }
 wasm-bindgen = "0.2.92"
 
 [features]
+stress = [
+  "dep:reqwest",
+  "dep:tokio",
+]
 hydrate = [
   "leptos/hydrate",
 ]
@@ -30,6 +35,10 @@ ssr = [
   "dep:leptos_axum",
   "leptos_router/ssr",
 ]
+
+[[bin]]
+name = "stress"
+required-features = ["stress"]
 
 [profile.release]
 panic = "abort"
@@ -46,6 +55,7 @@ denylist = ["axum", "tower", "tower-http", "tokio", "sqlx", "leptos_axum"]
 skip_feature_sets = [["ssr", "hydrate"]]
 
 [package.metadata.leptos]
+bin-target = "issue_3671"
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name
 output-name = "issue_3671"
 # The site root folder is where cargo-leptos generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.

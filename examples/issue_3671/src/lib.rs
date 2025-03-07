@@ -1,4 +1,6 @@
 pub mod app;
+#[cfg(feature = "stress")]
+pub mod stress;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
