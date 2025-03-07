@@ -29,8 +29,8 @@ Acquisition of `set_ctx` inside `hook`:
 - [x] Direct
 
 Method which `tokio::time::sleep` is invoked in the `hook`:
-- [ ] Via `ServerFn`
-- [x] Direct (gated with `feature = "ssr"`)
+- [x] Via `ServerFn`
+- [ ] Direct (gated with `feature = "ssr"`)
 
 A typical run:
 
@@ -38,10 +38,15 @@ A typical run:
 $ cargo run --bin stress --features stress -- http://localhost:4000
   ...
      Running `target/debug/stress 'http://localhost:4000'`
-ok    = 1000
-err   = 0
-sizes = {16952: 1000}
+ok    = 960
+err   = 40
+sizes = {17088: 960}
 ```
 
-No errors produced, as no context nor resources were used, just direct
-usage of signals.
+Sticking with the direct signal usage, but reintroducing the use of
+`Resource` + `ServerFn` back in, this different panic happens:
+
+```
+thread 'tokio-runtime-worker' panicked at /leptos/reactive_graph/src/owner/arena.rs:57:25:
+at /leptos/reactive_graph/src/owner/arena.rs:60:29, the `sandboxed-arenas` feature is active, but no Arena is active
+```
