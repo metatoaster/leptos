@@ -52,7 +52,11 @@ fn HomePage() -> impl IntoView {
     provide_context(set_ctx);
 
     // #[cfg(not(feature = "ssr"))]
-    on_cleanup(|| expect_context::<WriteSignal<Ctx>>().set(Ctx(None)));
+    on_cleanup(|| {
+        if let Some(ctx) = use_context::<WriteSignal<Ctx>>() {
+            ctx.set(Ctx(None))
+        }
+    });
 
     let hook = move || {
         let resource = Resource::new_blocking(

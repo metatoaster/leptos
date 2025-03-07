@@ -20,8 +20,8 @@ Route `ssr=`:
 - [ ] Default (`SsrMode::OutOfOrder`)
 
 Acquisition of `set_ctx` inside `on_cleanup`:
-- [x] `expect_context`
-- [ ] `use_context`
+- [ ] `expect_context`
+- [x] `use_context`
 - [ ] Direct
 
 Acquisition of `set_ctx` inside `hook`:
@@ -38,23 +38,21 @@ A typical run:
 $ cargo run --bin stress --features stress -- http://localhost:4000
   ...
      Running `target/debug/stress 'http://localhost:4000'`
-ok    = 477
-err   = 523
-sizes = {17088: 477}
+ok    = 520
+err   = 480
+sizes = {17088: 520}
+$ cargo ...
+  ...
+ok    = 521
+err   = 479
+sizes = {17088: 521}
 ```
 
 The server process will produce the following panics:
 
-Roughly ~93% is of the kind:
+100% is of the kind:
 
 ```
 thread 'tokio-runtime-worker' panicked at /leptos/reactive_graph/src/owner.rs:258:26:
 already mutably borrowed: BorrowError
-```
-
-Roughly ~7% is of the kind:
-
-```
-thread 'tokio-runtime-worker' panicked at /leptos/reactive_graph/src/owner/context.rs:305:9:
-Location { file: "src/app.rs", line: 55, col: 19 } expected context of type "reactive_graph::signal::write::WriteSignal<issue_3671::app::Ctx>" to be present
 ```
