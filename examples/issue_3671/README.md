@@ -21,12 +21,12 @@ Route `ssr=`:
 
 Acquisition of `set_ctx` inside `on_cleanup`:
 - [ ] `expect_context`
-- [x] `use_context`
-- [ ] Direct
+- [ ] `use_context`
+- [x] Direct
 
 Acquisition of `set_ctx` inside `hook`:
-- [x] `expect_context`
-- [ ] Direct
+- [ ] `expect_context`
+- [x] Direct
 
 Method which `tokio::time::sleep` is invoked in the `hook`:
 - [ ] Via `ServerFn`
@@ -35,18 +35,13 @@ Method which `tokio::time::sleep` is invoked in the `hook`:
 A typical run:
 
 ```shell
-$ cargo run --bin stress --features stress -- http://localhost:4000 10000
+$ cargo run --bin stress --features stress -- http://localhost:4000
   ...
-     Running `target/debug/stress 'http://localhost:4000' 10000`
-ok    = 9992
-err   = 8
-sizes = {16952: 9992}
+     Running `target/debug/stress 'http://localhost:4000'`
+ok    = 1000
+err   = 0
+sizes = {16952: 1000}
 ```
 
-This time we need to increase the amount of requests made to trigger the
-panic, which is 100% of the following:
-
-```
-thread 'tokio-runtime-worker' panicked at /leptos/reactive_graph/src/owner.rs:258:26:
-already mutably borrowed: BorrowError
-```
+No errors produced, as no context nor resources were used, just direct
+usage of signals.

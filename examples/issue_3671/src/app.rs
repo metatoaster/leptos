@@ -43,20 +43,15 @@ struct Ctx(Option<()>);
 #[component]
 fn HomePage() -> impl IntoView {
     let (_, set_ctx) = signal(Ctx(None));
-    provide_context(set_ctx);
 
     // #[cfg(not(feature = "ssr"))]
-    on_cleanup(|| {
-        if let Some(ctx) = use_context::<WriteSignal<Ctx>>() {
-            ctx.set(Ctx(None))
-        }
-    });
+    on_cleanup(move || set_ctx.set(Ctx(None)));
 
     let hook = move || {
         Suspend::new(async move {
             #[cfg(feature = "ssr")]
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            expect_context::<WriteSignal<Ctx>>().set(Ctx(Some(())))
+            set_ctx.set(Ctx(Some(())))
         })
     };
     view! {
