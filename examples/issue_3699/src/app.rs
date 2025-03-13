@@ -174,8 +174,15 @@ fn Foo() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
     on_cleanup(move || {
-        leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
-        set_ctx.update(|c| c.clear());
+        // a bare set_ctx will result in the cleanup triggering the
+        // re-render immediately which results in the resource that
+        // might be set later in another component from triggering the
+        // actual render.
+        leptos::logging::log!("Running on_cleanup in Foo");
+        Effect::new(move || {
+            leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
+            set_ctx.update(|c| c.clear());
+        });
     });
 
     let hook = move || set_ctx.update(move |c| {
@@ -200,8 +207,11 @@ fn Bar() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
     on_cleanup(move || {
-        leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
-        set_ctx.update(|c| c.clear());
+        leptos::logging::log!("Running on_cleanup in Bar");
+        Effect::new(move || {
+            leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
+            set_ctx.update(|c| c.clear());
+        });
     });
 
     let hook = move || set_ctx.update(move |c| {
