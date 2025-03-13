@@ -29,9 +29,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 pub fn App() -> impl IntoView {
     provide_meta_context();
 
-    let (rs, ws) = signal(Ctx(None));
-    provide_context(rs);
-    provide_context(ws);
+    Ctx::provide();
 
     let fallback = || view! { "Page not found." }.into_view();
     view! {
@@ -69,24 +67,35 @@ pub fn App() -> impl IntoView {
     }
 }
 
-#[derive(Clone, Debug)]
-struct Ctx(Option<Resource<Result<String, ServerFnError>>>);
+#[derive(Clone, Debug, Default)]
+pub struct Ctx {
+    inner: Option<Resource<Result<String, ServerFnError>>>,
+    refresh: RwSignal<usize>,
+}
 
-// `PartialEq` is required for `PortletCtx<T>` in order for it to be
-// enclosed inside a `ReadSignal`.  Since implementing `PartialEq` for
-// `ArcResource<...> is not exactly feasible, and that what this use
-// case ultimately cares about is whether or not there is some resource
-// being assigned, thus comparison using `.is_none()` is sufficient, and
-// assume all resources are not equal to another.
-impl PartialEq for Ctx {
-    fn eq(&self, other: &Self) -> bool {
-        // leptos::logging::log!("PartialEq::eq for Ctx");
-        // if self.0.is_none() {
-        //     other.0.is_none()
-        // } else {
-        //     true
-        // }
-        false
+impl Ctx {
+    /// Clear the resource in the portlet.  The component using this
+    /// may decide to not render anything.
+    pub fn clear(&mut self) {
+        self.refresh.try_update(|n| *n += 1);
+        self.inner = None;
+    }
+
+    /// Set the resource for this portlet.
+    pub fn set(&mut self, value: Resource<Result<String, ServerFnError>>) {
+        self.refresh.try_update(|n| *n += 1);
+        self.inner = Some(value);
+    }
+
+    /// The reason why there is no constructor provided and only done so
+    /// via signal is to have these contexts function as a singleton.
+    pub fn provide() {
+        let (rs, ws) = signal(Ctx {
+            inner: None,
+            refresh: RwSignal::new(0),
+        });
+        provide_context(rs);
+        provide_context(ws);
     }
 }
 
@@ -97,22 +106,23 @@ fn CtxView() -> impl IntoView {
     let waiter = Waiter::maybe();
     let resource = Resource::new_blocking(
         {
-            let rs = rs.clone();
+            let refresh = rs.get_untracked().refresh.clone();
             move || {
                 leptos::logging::log!("into_render suspend resource signaled!");
-                rs.get()
+                refresh.get()
             }
         },
-        move |ctx| {
+        move |id| {
             #[cfg(feature = "ssr")]
             let waiter = waiter.clone();
-            // let rs = rs.clone();
+            leptos::logging::log!("refresh id {id}");
+            let rs = rs.clone();
             async move {
-                // let ctx = rs.get();
+                let ctx = rs.get();
                 #[cfg(feature = "ssr")]
                 waiter.subscribe().wait().await;
                 leptos::logging::log!("ctx = {ctx:?}");
-                if let Some(resource) = ctx.0 {
+                if let Some(resource) = ctx.inner {
                     leptos::logging::log!("resource returning Some");
                     Some(resource.await)
                 } else {
@@ -163,34 +173,22 @@ fn HomePage() -> impl IntoView {
 fn Foo() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
-    // on_cleanup(move || {
-    //     leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
-    //     set_ctx.set(Ctx(None));
-    // });
     on_cleanup(move || {
-        // a bare set_ctx will result in the cleanup triggering the
-        // re-render immediately which results in the resource that
-        // might be set later in another component from triggering the
-        // actual render.
-        // set_ctx.set(Ctx(None));
-        leptos::logging::log!("Running on_cleanup in Foo");
-        Effect::new(move || {
-            leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
-            set_ctx.set(Ctx(None));
-        });
+        leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
+        set_ctx.update(|c| c.clear());
     });
 
-    let hook = move || {
+    let hook = move || set_ctx.update(move |c| {
         leptos::logging::log!("set_ctx with Some(Resource) in Foo hook");
-        set_ctx.set(Ctx(Some(Resource::new_blocking(
+        c.set(Resource::new_blocking(
             move || (),
             move |_| async move {
-                // hypothetical access to other resources/server_fn call here
-                serverfn().await?;
+                // emulate access to other resources/server_fn
+                // serverfn().await?;
                 Ok("set_ctx in Foo".to_string())
             },
-        ))))
-    };
+        ))
+    });
     view! {
         <h1>"Foo"</h1>
         {hook}
@@ -202,24 +200,21 @@ fn Bar() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
     on_cleanup(move || {
-        leptos::logging::log!("Running on_cleanup in Bar");
-        Effect::new(move || {
-            leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
-            set_ctx.set(Ctx(None));
-        });
+        leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
+        set_ctx.update(|c| c.clear());
     });
 
-    let hook = move || {
+    let hook = move || set_ctx.update(move |c| {
         leptos::logging::log!("set_ctx with Some(Resource) in Bar hook");
-        set_ctx.set(Ctx(Some(Resource::new_blocking(
+        c.set(Resource::new_blocking(
             move || (),
             move |_| async move {
-                // hypothetical access to other resources/server_fn call here
-                serverfn().await?;
+                // emulate access to other resources/server_fn
+                // serverfn().await?;
                 Ok("set_ctx in Bar".to_string())
             },
-        ))))
-    };
+        ))
+    });
     view! {
         <h1>"Bar"</h1>
         {hook}
