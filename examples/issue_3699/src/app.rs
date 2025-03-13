@@ -5,6 +5,10 @@ use leptos_router::{
     path, SsrMode,
 };
 
+use crate::sync_await::SyncAwait;
+#[cfg(feature = "ssr")]
+use crate::sync_await::ssr::Waiter;
+
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
         <!DOCTYPE html>
@@ -42,23 +46,22 @@ pub fn App() -> impl IntoView {
                     </ul>
                 </nav>
 
-                // Having CtxView before routes is the source of the issue
-                // needing the workaround described later
-                <div>"Start CtxView"</div>
-                <CtxView/>
-                <div>"End CtxView"</div>
+                <SyncAwait>
+                    <div>"Start Before CtxView"</div>
+                    <CtxView/>
+                    <div>"End Before CtxView"</div>
 
-                <div>"Routes"</div>
-                <Routes fallback>
-                    <Route path=path!("") view=HomePage ssr=SsrMode::Async/>
-                    <Route path=path!("/foo") view=Foo ssr=SsrMode::Async/>
-                    <Route path=path!("/bar") view=Bar ssr=SsrMode::Async/>
-                </Routes>
+                    <div>"Routes"</div>
+                    <Routes fallback>
+                        <Route path=path!("") view=HomePage ssr=SsrMode::Async/>
+                        <Route path=path!("/foo") view=Foo ssr=SsrMode::Async/>
+                        <Route path=path!("/bar") view=Bar ssr=SsrMode::Async/>
+                    </Routes>
 
-                // CtxView after routes has less issue
-                // <div>"Start CtxView"</div>
-                // <CtxView/>
-                // <div>"End CtxView"</div>
+                    <div>"Start After CtxView"</div>
+                    <CtxView/>
+                    <div>"End After CtxView"</div>
+                </SyncAwait>
 
                 <div>"End of main"</div>
             </main>
@@ -69,50 +72,71 @@ pub fn App() -> impl IntoView {
 #[derive(Clone, Debug)]
 struct Ctx(Option<Resource<Result<String, ServerFnError>>>);
 
+// `PartialEq` is required for `PortletCtx<T>` in order for it to be
+// enclosed inside a `ReadSignal`.  Since implementing `PartialEq` for
+// `ArcResource<...> is not exactly feasible, and that what this use
+// case ultimately cares about is whether or not there is some resource
+// being assigned, thus comparison using `.is_none()` is sufficient, and
+// assume all resources are not equal to another.
+impl PartialEq for Ctx {
+    fn eq(&self, other: &Self) -> bool {
+        if self.0.is_none() {
+            other.0.is_none()
+        } else {
+            false
+        }
+    }
+}
+
 #[component]
 fn CtxView() -> impl IntoView {
     let rs = expect_context::<ReadSignal<Ctx>>();
     view! {
         <Transition>{
-            move || Suspend::new(async move {
-                let ctx = rs.get();
-                leptos::logging::log!("ctx = {ctx:?}");
-                if let Some(resource) = ctx.0 {
-                    let value = resource.await?;
-                    leptos::logging::log!("returning actual view");
-                    Ok::<_, ServerFnError>(
-                        view! {
-                            <div>"The value is: "{value}</div>
-                        }
-                        .into_any()
-                    )
-                } else {
-                    leptos::logging::log!("returning empty view");
-                    // XXX this return value will result in hydration error
-                    // if CtxView comes before routes
-                    // Ok::<_, ServerFnError>(().into_any())
-
-                    // basically any response here that doesn't include some
-                    // kind of html element will result in the error.
-
-                    // a view will help with mitigating the issue, but it
-                    // must return some element, not just text.
-                    Ok(
-                        view! {
-                            // Uncomment following to use the workaround:
-                            // <noscript></noscript>
-                            // uncomment the following string will also show
-                            // the hydration error:
-                            // "<noscript></noscript>"
-                        }
-                        .into_any()
-                    )
-                }
-            })
+            move || {
+                #[cfg(feature = "ssr")]
+                let waiter = Waiter::maybe();
+                Suspend::new(async move {
+                    let result = Resource::new_blocking(
+                        {
+                            let rs = rs.clone();
+                            move || {
+                                leptos::logging::log!("into_render suspend resource signaled!");
+                                rs.get()
+                            }
+                        },
+                        move |ctx| {
+                            #[cfg(feature = "ssr")]
+                            let waiter = waiter.clone();
+                            async move {
+                                #[cfg(feature = "ssr")]
+                                waiter.subscribe().wait().await;
+                                leptos::logging::log!("ctx = {ctx:?}");
+                                if let Some(resource) = ctx.0 {
+                                    Some(resource.await)
+                                } else {
+                                    None
+                                }
+                            }
+                        },
+                    ).await;
+                    if let Some(result) = result {
+                        let value = result?;
+                        leptos::logging::log!("returning actual view");
+                        Ok::<_, ServerFnError>(
+                            Some(view! {
+                                <div>"The value is: "{value}</div>
+                            }
+                            .into_any())
+                        )
+                    } else {
+                        Ok(None)
+                    }
+                })
+            }
         }</Transition>
     }
 }
-
 
 #[component]
 fn HomePage() -> impl IntoView {
@@ -126,16 +150,8 @@ fn Foo() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
     on_cleanup(move || {
-        // a bare set_ctx will result in the cleanup triggering the
-        // re-render immediately which results in the resource that
-        // might be set later in another component from triggering the
-        // actual render.
-        // set_ctx.set(Ctx(None));
-        leptos::logging::log!("Running on_cleanup in Foo");
-        Effect::new(move || {
-            leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
-            set_ctx.set(Ctx(None));
-        });
+        leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
+        set_ctx.set(Ctx(None));
     });
 
     let hook = move || {
@@ -159,11 +175,8 @@ fn Bar() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
     on_cleanup(move || {
-        leptos::logging::log!("Running on_cleanup in Bar");
-        Effect::new(move || {
-            leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
-            set_ctx.set(Ctx(None));
-        });
+        leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
+        set_ctx.set(Ctx(None));
     });
 
     let hook = move || {
