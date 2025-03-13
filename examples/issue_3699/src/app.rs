@@ -80,62 +80,76 @@ struct Ctx(Option<Resource<Result<String, ServerFnError>>>);
 // assume all resources are not equal to another.
 impl PartialEq for Ctx {
     fn eq(&self, other: &Self) -> bool {
-        if self.0.is_none() {
-            other.0.is_none()
-        } else {
-            false
-        }
+        // leptos::logging::log!("PartialEq::eq for Ctx");
+        // if self.0.is_none() {
+        //     other.0.is_none()
+        // } else {
+        //     true
+        // }
+        false
     }
 }
 
 #[component]
 fn CtxView() -> impl IntoView {
     let rs = expect_context::<ReadSignal<Ctx>>();
+    #[cfg(feature = "ssr")]
+    let waiter = Waiter::maybe();
+    let resource = Resource::new_blocking(
+        {
+            let rs = rs.clone();
+            move || {
+                leptos::logging::log!("into_render suspend resource signaled!");
+                rs.get()
+            }
+        },
+        move |ctx| {
+            #[cfg(feature = "ssr")]
+            let waiter = waiter.clone();
+            // let rs = rs.clone();
+            async move {
+                // let ctx = rs.get();
+                #[cfg(feature = "ssr")]
+                waiter.subscribe().wait().await;
+                leptos::logging::log!("ctx = {ctx:?}");
+                if let Some(resource) = ctx.0 {
+                    leptos::logging::log!("resource returning Some");
+                    Some(resource.await)
+                } else {
+                    leptos::logging::log!("resource returning None");
+                    None
+                }
+            }
+        },
+    );
+    let suspend = move || { Suspend::new(async move {
+        let result = resource.await;
+        if let Some(result) = result {
+            let value = result?;
+            leptos::logging::log!("Suspend view returning Some");
+            Ok::<_, ServerFnError>(
+                Some(view! {
+                    <div>"The value is: "{value}</div>
+                }
+                .into_any())
+            )
+        } else {
+            leptos::logging::log!("Suspend view returning None");
+            Ok(None)
+        }
+    })};
+
     view! {
         <Transition>{
-            move || {
-                #[cfg(feature = "ssr")]
-                let waiter = Waiter::maybe();
-                Suspend::new(async move {
-                    let result = Resource::new_blocking(
-                        {
-                            let rs = rs.clone();
-                            move || {
-                                leptos::logging::log!("into_render suspend resource signaled!");
-                                rs.get()
-                            }
-                        },
-                        move |ctx| {
-                            #[cfg(feature = "ssr")]
-                            let waiter = waiter.clone();
-                            async move {
-                                #[cfg(feature = "ssr")]
-                                waiter.subscribe().wait().await;
-                                leptos::logging::log!("ctx = {ctx:?}");
-                                if let Some(resource) = ctx.0 {
-                                    Some(resource.await)
-                                } else {
-                                    None
-                                }
-                            }
-                        },
-                    ).await;
-                    if let Some(result) = result {
-                        let value = result?;
-                        leptos::logging::log!("returning actual view");
-                        Ok::<_, ServerFnError>(
-                            Some(view! {
-                                <div>"The value is: "{value}</div>
-                            }
-                            .into_any())
-                        )
-                    } else {
-                        Ok(None)
-                    }
-                })
-            }
+            move || suspend()
         }</Transition>
     }
+}
+
+#[server]
+async fn serverfn() -> Result<(), ServerFnError> {
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    Ok(())
 }
 
 #[component]
@@ -149,9 +163,21 @@ fn HomePage() -> impl IntoView {
 fn Foo() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
+    // on_cleanup(move || {
+    //     leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
+    //     set_ctx.set(Ctx(None));
+    // });
     on_cleanup(move || {
-        leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
-        set_ctx.set(Ctx(None));
+        // a bare set_ctx will result in the cleanup triggering the
+        // re-render immediately which results in the resource that
+        // might be set later in another component from triggering the
+        // actual render.
+        // set_ctx.set(Ctx(None));
+        leptos::logging::log!("Running on_cleanup in Foo");
+        Effect::new(move || {
+            leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
+            set_ctx.set(Ctx(None));
+        });
     });
 
     let hook = move || {
@@ -160,6 +186,7 @@ fn Foo() -> impl IntoView {
             move || (),
             move |_| async move {
                 // hypothetical access to other resources/server_fn call here
+                serverfn().await?;
                 Ok("set_ctx in Foo".to_string())
             },
         ))))
@@ -175,8 +202,11 @@ fn Bar() -> impl IntoView {
     let set_ctx = expect_context::<WriteSignal<Ctx>>();
 
     on_cleanup(move || {
-        leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
-        set_ctx.set(Ctx(None));
+        leptos::logging::log!("Running on_cleanup in Bar");
+        Effect::new(move || {
+            leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
+            set_ctx.set(Ctx(None));
+        });
     });
 
     let hook = move || {
@@ -185,6 +215,7 @@ fn Bar() -> impl IntoView {
             move || (),
             move |_| async move {
                 // hypothetical access to other resources/server_fn call here
+                serverfn().await?;
                 Ok("set_ctx in Bar".to_string())
             },
         ))))
