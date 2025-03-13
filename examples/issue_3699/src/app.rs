@@ -118,9 +118,9 @@ fn CtxView() -> impl IntoView {
             leptos::logging::log!("refresh id {id}");
             let rs = rs.clone();
             async move {
-                let ctx = rs.get();
                 #[cfg(feature = "ssr")]
                 waiter.subscribe().wait().await;
+                let ctx = rs.get();
                 leptos::logging::log!("ctx = {ctx:?}");
                 if let Some(resource) = ctx.inner {
                     leptos::logging::log!("resource returning Some");
