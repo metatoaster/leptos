@@ -185,7 +185,7 @@ fn Foo() -> impl IntoView {
         });
     });
 
-    let hook = move || set_ctx.update(move |c| {
+    set_ctx.update(move |c| {
         leptos::logging::log!("set_ctx with Some(Resource) in Foo hook");
         c.set(Resource::new_blocking(
             move || (),
@@ -198,7 +198,6 @@ fn Foo() -> impl IntoView {
     });
     view! {
         <h1>"Foo"</h1>
-        {hook}
     }
 }
 
@@ -214,7 +213,7 @@ fn Bar() -> impl IntoView {
         });
     });
 
-    let hook = move || set_ctx.update(move |c| {
+    set_ctx.update(move |c| {
         leptos::logging::log!("set_ctx with Some(Resource) in Bar hook");
         c.set(Resource::new_blocking(
             move || (),
@@ -227,6 +226,5 @@ fn Bar() -> impl IntoView {
     });
     view! {
         <h1>"Bar"</h1>
-        {hook}
     }
 }
