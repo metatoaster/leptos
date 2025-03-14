@@ -56,9 +56,9 @@ pub fn App() -> impl IntoView {
                         <Route path=path!("/bar") view=Bar ssr=SsrMode::Async/>
                     </Routes>
 
-                    <div>"Start After CtxView"</div>
-                    <CtxView/>
-                    <div>"End After CtxView"</div>
+                    // <div>"Start After CtxView"</div>
+                    // <CtxView/>
+                    // <div>"End After CtxView"</div>
                 </SyncAwait>
 
                 <div>"End of main"</div>
