@@ -191,7 +191,7 @@ fn Foo() -> impl IntoView {
             move || (),
             move |_| async move {
                 // emulate access to other resources/server_fn
-                // serverfn().await?;
+                serverfn().await?;
                 Ok("set_ctx in Foo".to_string())
             },
         ))
@@ -219,7 +219,7 @@ fn Bar() -> impl IntoView {
             move || (),
             move |_| async move {
                 // emulate access to other resources/server_fn
-                // serverfn().await?;
+                serverfn().await?;
                 Ok("set_ctx in Bar".to_string())
             },
         ))
