@@ -1,13 +1,12 @@
+#[cfg(feature = "ssr")]
+use crate::sync_await::ssr::Waiter;
+use crate::sync_await::SyncAwait;
 use leptos::prelude::*;
 use leptos_meta::{MetaTags, *};
 use leptos_router::{
-    components::{A, Route, Router, Routes},
+    components::{Route, Router, Routes, A},
     path, SsrMode,
 };
-
-use crate::sync_await::SyncAwait;
-#[cfg(feature = "ssr")]
-use crate::sync_await::ssr::Waiter;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
@@ -106,7 +105,7 @@ fn CtxView() -> impl IntoView {
     let waiter = Waiter::maybe();
     let resource = Resource::new_blocking(
         {
-            let refresh = rs.get_untracked().refresh.clone();
+            let refresh = rs.get_untracked().refresh;
             move || {
                 leptos::logging::log!("into_render suspend resource signaled!");
                 refresh.get()
@@ -116,7 +115,6 @@ fn CtxView() -> impl IntoView {
             #[cfg(feature = "ssr")]
             let waiter = waiter.clone();
             leptos::logging::log!("refresh id {id}");
-            let rs = rs.clone();
             async move {
                 #[cfg(feature = "ssr")]
                 waiter.subscribe().wait().await;
@@ -132,22 +130,24 @@ fn CtxView() -> impl IntoView {
             }
         },
     );
-    let suspend = move || { Suspend::new(async move {
-        let result = resource.await;
-        if let Some(result) = result {
-            let value = result?;
-            leptos::logging::log!("Suspend view returning Some");
-            Ok::<_, ServerFnError>(
-                Some(view! {
-                    <div>"The value is: "{value}</div>
-                }
-                .into_any())
-            )
-        } else {
-            leptos::logging::log!("Suspend view returning None");
-            Ok(None)
-        }
-    })};
+    let suspend = move || {
+        Suspend::new(async move {
+            let result = resource.await;
+            if let Some(result) = result {
+                let value = result?;
+                leptos::logging::log!("Suspend view returning Some");
+                Ok::<_, ServerFnError>(Some(
+                    view! {
+                        <div>"The value is: "{value}</div>
+                    }
+                    .into_any(),
+                ))
+            } else {
+                leptos::logging::log!("Suspend view returning None");
+                Ok(None)
+            }
+        })
+    };
 
     view! {
         <Transition>{
@@ -180,7 +180,9 @@ fn Foo() -> impl IntoView {
         // actual render.
         leptos::logging::log!("Running on_cleanup in Foo");
         Effect::new(move || {
-            leptos::logging::log!("set_ctx with None in Effect of Foo on_cleanup");
+            leptos::logging::log!(
+                "set_ctx with None in Effect of Foo on_cleanup"
+            );
             set_ctx.update(|c| c.clear());
         });
     });
@@ -208,7 +210,9 @@ fn Bar() -> impl IntoView {
     on_cleanup(move || {
         leptos::logging::log!("Running on_cleanup in Bar");
         Effect::new(move || {
-            leptos::logging::log!("set_ctx with None in Effect of Bar on_cleanup");
+            leptos::logging::log!(
+                "set_ctx with None in Effect of Bar on_cleanup"
+            );
             set_ctx.update(|c| c.clear());
         });
     });
