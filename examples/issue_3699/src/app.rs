@@ -177,8 +177,9 @@ fn Foo() -> impl IntoView {
         // a bare set_ctx will result in the cleanup triggering the
         // re-render immediately which results in the resource that
         // might be set later in another component from triggering the
-        // actual render.
+        // actual render be removed instead.
         leptos::logging::log!("Running on_cleanup in Foo");
+        // set_ctx.update(|c| c.clear());
         Effect::new(move || {
             leptos::logging::log!(
                 "set_ctx with None in Effect of Foo on_cleanup"
@@ -187,19 +188,22 @@ fn Foo() -> impl IntoView {
         });
     });
 
-    set_ctx.update(move |c| {
-        leptos::logging::log!("set_ctx with Some(Resource) in Foo hook");
-        c.set(Resource::new_blocking(
-            move || (),
-            move |_| async move {
-                // emulate access to other resources/server_fn
-                serverfn().await?;
-                Ok("set_ctx in Foo".to_string())
-            },
-        ))
-    });
+    let hook = move || {
+        set_ctx.update(move |c| {
+            leptos::logging::log!("set_ctx with Some(Resource) in Foo hook");
+            c.set(Resource::new_blocking(
+                move || (),
+                move |_| async move {
+                    // emulate access to other resources/server_fn
+                    // serverfn().await?;
+                    Ok("set_ctx in Foo".to_string())
+                },
+            ))
+        })
+    };
     view! {
         <h1>"Foo"</h1>
+        {hook}
     }
 }
 
@@ -209,6 +213,7 @@ fn Bar() -> impl IntoView {
 
     on_cleanup(move || {
         leptos::logging::log!("Running on_cleanup in Bar");
+        // set_ctx.update(|c| c.clear());
         Effect::new(move || {
             leptos::logging::log!(
                 "set_ctx with None in Effect of Bar on_cleanup"
@@ -217,18 +222,21 @@ fn Bar() -> impl IntoView {
         });
     });
 
-    set_ctx.update(move |c| {
-        leptos::logging::log!("set_ctx with Some(Resource) in Bar hook");
-        c.set(Resource::new_blocking(
-            move || (),
-            move |_| async move {
-                // emulate access to other resources/server_fn
-                serverfn().await?;
-                Ok("set_ctx in Bar".to_string())
-            },
-        ))
-    });
+    let hook = move || {
+        set_ctx.update(move |c| {
+            leptos::logging::log!("set_ctx with Some(Resource) in Bar hook");
+            c.set(Resource::new_blocking(
+                move || (),
+                move |_| async move {
+                    // emulate access to other resources/server_fn
+                    // serverfn().await?;
+                    Ok("set_ctx in Bar".to_string())
+                },
+            ))
+        })
+    };
     view! {
         <h1>"Bar"</h1>
+        {hook}
     }
 }
