@@ -57,7 +57,11 @@ default = [
   "server_fn/axum",
   "leptos_integration_utils/fs",
 ]
-embed = ["dep:mime_guess", "dep:rust-embed"]
+embed = [
+  "dep:mime_guess",
+  "dep:rust-embed",
+  "tower-http/fs",
+]
 islands-router = ["tachys/islands"]
 tracing = ["dep:tracing"]
 
